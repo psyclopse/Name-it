@@ -1,241 +1,351 @@
-// Remove any Firebase import statements
+// Game page functionality
+import { 
+    getUrlParams, 
+    showError, 
+    hideError, 
+    getRandomLetter,
+    validateAnswer,
+    CATEGORIES,
+    GAME_STATES,
+    ROUND_DURATION
+} from './utils.js';
 
-let gameRoom = null;
-let currentPlayer = '';
-let gameTimer = null;
-let timeLeft = 45;
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Get room and player from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    gameRoom = urlParams.get('room');
-    currentPlayer = urlParams.get('player');
-    
-    if (!gameRoom || !currentPlayer) {
-        window.location.href = 'index.html';
-        return;
+class GameController {
+    constructor() {
+        this.roomCode = null;
+        this.playerName = null;
+        this.isHost = false;
+        this.roomListener = null;
+        this.timer = null;
+        this.timeLeft = ROUND_DURATION;
+        
+        this.initializeFromUrl();
+        this.initializeElements();
+        this.attachEventListeners();
+        this.startListening();
     }
-    
-    document.getElementById('roomCode').textContent = `Room: ${gameRoom}`;
-    
-    // Set up event listeners
-    document.getElementById('submitAnswers').addEventListener('click', submitAnswers);
-    document.getElementById('nextRoundBtn').addEventListener('click', nextRound);
-    
-    // Listen for game state changes
-    listenForGameUpdates();
-    
-    // Load initial game state
-    loadGameState();
-});
 
-function listenForGameUpdates() {
-    db.collection('rooms').doc(gameRoom).onSnapshot((doc) => {
-        if (doc.exists) {
-            const gameData = doc.data();
-            updateGameUI(gameData);
+    initializeFromUrl() {
+        const params = getUrlParams();
+        this.roomCode = params.roomCode;
+        this.playerName = params.playerName;
+        
+        if (!this.roomCode || !this.playerName) {
+            showError('Missing room or player information. Redirecting to home...');
+            setTimeout(() => window.location.href = 'index.html', 2000);
+            return;
         }
-    });
-}
-
-async function loadGameState() {
-    try {
-        const roomSnap = await db.collection('rooms').doc(gameRoom).get();
-        if (roomSnap.exists) {
-            const gameData = roomSnap.data();
-            updateGameUI(gameData);
-        }
-    } catch (error) {
-        console.error('Error loading game state:', error);
     }
-}
 
-function updateGameUI(gameData) {
-    if (gameData.gameState === 'playing') {
-        startRound(gameData.currentLetter);
-        updateScoreboard(gameData.players);
-    } else if (gameData.gameState === 'reviewing') {
-        showReviewPhase(gameData);
+    initializeElements() {
+        // Header elements
+        this.gameRoomCodeSpan = document.getElementById('gameRoomCode');
+        this.roundNumberSpan = document.getElementById('roundNumber');
+        this.playerNameSpan = document.getElementById('playerName');
+        this.playerScoreSpan = document.getElementById('playerScore');
+        
+        // Game state containers
+        this.waitingState = document.getElementById('waitingState');
+        this.playingState = document.getElementById('playingState');
+        this.reviewState = document.getElementById('reviewState');
+        this.resultsState = document.getElementById('resultsState');
+        
+        // Waiting state elements
+        this.playersGrid = document.getElementById('playersGrid');
+        this.hostControls = document.getElementById('hostControls');
+        this.lettersGrid = document.getElementById('lettersGrid');
+        
+        // Playing state elements
+        this.currentLetterSpan = document.getElementById('currentLetter');
+        this.timerDisplay = document.getElementById('timerDisplay');
+        this.submitAnswersBtn = document.getElementById('submitAnswersBtn');
+        
+        // Answer inputs
+        this.answerInputs = {
+            people: document.getElementById('peopleAnswer'),
+            things: document.getElementById('thingsAnswer'),
+            animals: document.getElementById('animalsAnswer'),
+            places: document.getElementById('placesAnswer')
+        };
+        
+        // Review state elements
+        this.reviewGrid = document.getElementById('reviewGrid');
+        this.submitReviewBtn = document.getElementById('submitReviewBtn');
+        
+        // Results state elements
+        this.resultsGrid = document.getElementById('resultsGrid');
+        this.leaderboardList = document.getElementById('leaderboardList');
+        this.nextRoundControls = document.getElementById('nextRoundControls');
+        this.nextRoundBtn = document.getElementById('nextRoundBtn');
+        
+        // Actions
+        this.leaveGameBtn = document.getElementById('leaveGameBtn');
     }
-}
 
-function startRound(letter) {
-    document.getElementById('currentLetter').textContent = `Letter: ${letter}`;
-    
-    // Clear previous answers
-    document.querySelectorAll('.categories input').forEach(input => {
-        input.value = '';
-        input.disabled = false;
-    });
-    
-    // Start timer
-    timeLeft = 45;
-    document.getElementById('timer').textContent = timeLeft;
-    
-    gameTimer = setInterval(() => {
-        timeLeft--;
-        document.getElementById('timer').textContent = timeLeft;
+    attachEventListeners() {
+        this.submitAnswersBtn.addEventListener('click', () => this.submitAnswers());
+        this.submitReviewBtn.addEventListener('click', () => this.submitReview());
+        this.nextRoundBtn.addEventListener('click', () => this.startNextRound());
+        this.leaveGameBtn.addEventListener('click', () => this.leaveGame());
         
-        if (timeLeft <= 0) {
-            clearInterval(gameTimer);
-            autoSubmitAnswers();
-        }
-    }, 1000);
-    
-    // Show game area, hide review
-    document.querySelector('.game-area').style.display = 'block';
-    document.getElementById('reviewPhase').style.display = 'none';
-}
-
-async function submitAnswers() {
-    if (gameTimer) {
-        clearInterval(gameTimer);
-    }
-    
-    const answers = {
-        person: document.getElementById('person').value.trim(),
-        place: document.getElementById('place').value.trim(),
-        animal: document.getElementById('animal').value.trim(),
-        thing: document.getElementById('thing').value.trim()
-    };
-    
-    // Disable inputs
-    document.querySelectorAll('.categories input').forEach(input => {
-        input.disabled = true;
-    });
-    
-    try {
-        // Submit answers to Firebase
-        await db.collection('rooms').doc(gameRoom).collection('answers').doc(currentPlayer).set({
-            player: currentPlayer,
-            answers: answers,
-            submitted: true,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        document.getElementById('submitAnswers').textContent = 'Answers Submitted!';
-        document.getElementById('submitAnswers').disabled = true;
-        
-    } catch (error) {
-        console.error('Error submitting answers:', error);
-    }
-}
-
-function autoSubmitAnswers() {
-    submitAnswers();
-}
-
-function showReviewPhase(gameData) {
-    document.querySelector('.game-area').style.display = 'none';
-    document.getElementById('reviewPhase').style.display = 'block';
-    
-    // Load all player answers for review
-    loadAnswersForReview();
-}
-
-async function loadAnswersForReview() {
-    try {
-        const answersSnap = await db.collection('rooms').doc(gameRoom).collection('answers').get();
-        const playersAnswersDiv = document.getElementById('playersAnswers');
-        playersAnswersDiv.innerHTML = '';
-        
-        answersSnap.forEach((doc) => {
-            const answerData = doc.data();
-            const playerDiv = createPlayerAnswerReview(answerData);
-            playersAnswersDiv.appendChild(playerDiv);
-        });
-        
-    } catch (error) {
-        console.error('Error loading answers for review:', error);
-    }
-}
-
-function createPlayerAnswerReview(answerData) {
-    const div = document.createElement('div');
-    div.className = 'player-review';
-    div.innerHTML = `
-        <h4>${answerData.player}</h4>
-        <div class="answer-review">
-            <label>Person: <input type="checkbox" data-category="person" data-player="${answerData.player}"> ${answerData.answers.person}</label>
-            <label>Place: <input type="checkbox" data-category="place" data-player="${answerData.player}"> ${answerData.answers.place}</label>
-            <label>Animal: <input type="checkbox" data-category="animal" data-player="${answerData.player}"> ${answerData.answers.animal}</label>
-            <label>Thing: <input type="checkbox" data-category="thing" data-player="${answerData.player}"> ${answerData.answers.thing}</label>
-        </div>
-    `;
-    return div;
-}
-
-async function nextRound() {
-    // Calculate scores based on checkboxes
-    const checkboxes = document.querySelectorAll('#playersAnswers input[type="checkbox"]:checked');
-    const scoreUpdates = {};
-    
-    checkboxes.forEach(checkbox => {
-        const player = checkbox.dataset.player;
-        if (!scoreUpdates[player]) {
-            scoreUpdates[player] = 0;
-        }
-        scoreUpdates[player] += 5; // 5 points per correct answer
-    });
-    
-    try {
-        // Update scores in Firebase
-        const roomRef = db.collection('rooms').doc(gameRoom);
-        const batch = db.batch();
-        
-        Object.keys(scoreUpdates).forEach(player => {
-            batch.update(roomRef, {
-                [`players.${player}.score`]: firebase.firestore.FieldValue.increment(scoreUpdates[player])
+        // Enter key for answer inputs
+        Object.values(this.answerInputs).forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.submitAnswers();
             });
         });
+    }
+
+    async startListening() {
+        if (!this.roomCode) return;
         
-        await batch.commit();
+        const roomRef = db.collection('rooms').doc(this.roomCode);
         
-        // Clear answers for next round
-        await db.collection('rooms').doc(gameRoom).collection('answers').get().then(snapshot => {
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            return batch.commit();
-        });
-        
-        // Start next round or end game
+        // Check if room exists first
         const roomSnap = await roomRef.get();
-        const roomData = roomSnap.data();
-        
-        if (roomData.currentRound >= roomData.maxRounds) {
-            // End game
-            await roomRef.update({
-                gameState: 'finished'
-            });
-            alert('Game finished! Check the final scores.');
-        } else {
-            // Next round
-            await roomRef.update({
-                gameState: 'playing',
-                currentLetter: getRandomLetter(),
-                currentRound: firebase.firestore.FieldValue.increment(1)
-            });
+        if (!roomSnap.exists) {
+            showError('Room not found. Redirecting to home...');
+            setTimeout(() => window.location.href = 'index.html', 2000);
+            return;
         }
         
-    } catch (error) {
-        console.error('Error processing next round:', error);
+        const roomData = roomSnap.data();
+        this.isHost = roomData.host === this.playerName;
+        
+        // Update header
+        this.gameRoomCodeSpan.textContent = this.roomCode;
+        this.playerNameSpan.textContent = this.playerName;
+        
+        // Start listening for changes
+        this.roomListener = roomRef.onSnapshot((doc) => {
+            if (doc.exists) {
+                this.handleRoomUpdate(doc.data());
+            } else {
+                showError('Room no longer exists. Redirecting to home...');
+                setTimeout(() => window.location.href = 'index.html', 2000);
+            }
+        });
     }
-}
 
-function updateScoreboard(players) {
-    const scoresDiv = document.getElementById('scores');
-    scoresDiv.innerHTML = '';
-    
-    Object.values(players).forEach(player => {
-        const scoreDiv = document.createElement('div');
-        scoreDiv.innerHTML = `${player.name}: ${player.score} points`;
-        scoresDiv.appendChild(scoreDiv);
-    });
-}
+    handleRoomUpdate(roomData) {
+        // Update round number and score
+        this.roundNumberSpan.textContent = roomData.currentRound || 1;
+        this.playerScoreSpan.textContent = roomData.scores[this.playerName] || 0;
+        
+        // Handle different game states
+        switch (roomData.gameState) {
+            case GAME_STATES.WAITING:
+                this.showWaitingState(roomData);
+                break;
+            case GAME_STATES.PLAYING:
+                this.showPlayingState(roomData);
+                break;
+            case GAME_STATES.REVIEWING:
+                this.showReviewState(roomData);
+                break;
+            case GAME_STATES.RESULTS:
+                this.showResultsState(roomData);
+                break;
+            case GAME_STATES.FINISHED:
+                this.showFinalResults(roomData);
+                break;
+        }
+    }
 
-function getRandomLetter() {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    return letters[Math.floor(Math.random() * letters.length)];
-}
+    showWaitingState(roomData) {
+        this.hideAllStates();
+        this.waitingState.style.display = 'block';
+        
+        // Update players grid
+        this.updatePlayersGrid(roomData.players, roomData.host);
+        
+        // Show host controls if user is host
+        if (this.isHost) {
+            this.hostControls.style.display = 'block';
+            this.generateLettersGrid(roomData.usedLetters || []);
+        } else {
+            this.hostControls.style.display = 'none';
+        }
+    }
+
+    showPlayingState(roomData) {
+        this.hideAllStates();
+        this.playingState.style.display = 'block';
+        
+        // Update current letter
+        this.currentLetterSpan.textContent = roomData.currentLetter || 'A';
+        
+        // Start timer if round just started
+        if (roomData.roundStartTime && !this.timer) {
+            const startTime = roomData.roundStartTime.toDate();
+            const elapsed = Math.floor((new Date() - startTime) / 1000);
+            this.timeLeft = Math.max(0, ROUND_DURATION - elapsed);
+            this.startTimer();
+        }
+        
+        // Check if player has already submitted
+        if (roomData.answers && roomData.answers[this.playerName]) {
+            this.submitAnswersBtn.textContent = 'Answers Submitted';
+            this.submitAnswersBtn.disabled = true;
+        }
+    }
+
+    showReviewState(roomData) {
+        this.hideAllStates();
+        this.reviewState.style.display = 'block';
+        
+        this.generateReviewGrid(roomData);
+    }
+
+    showResultsState(roomData) {
+        this.hideAllStates();
+        this.resultsState.style.display = 'block';
+        
+        this.generateResultsGrid(roomData);
+        this.updateLeaderboard(roomData.scores);
+        
+        // Show next round button for host
+        if (this.isHost) {
+            this.nextRoundControls.style.display = 'block';
+        }
+    }
+
+    hideAllStates() {
+        this.waitingState.style.display = 'none';
+        this.playingState.style.display = 'none';
+        this.reviewState.style.display = 'none';
+        this.resultsState.style.display = 'none';
+        
+        // Clear timer
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+    }
+
+    updatePlayersGrid(players, host) {
+        this.playersGrid.innerHTML = '';
+        
+        players.forEach(player => {
+            const playerCard = document.createElement('div');
+            playerCard.className = 'player-card';
+            if (player === host) playerCard.classList.add('host');
+            
+            playerCard.innerHTML = `
+                <h4>${player}</h4>
+                <p>${player === host ? 'Host' : 'Player'}</p>
+            `;
+            
+            this.playersGrid.appendChild(playerCard);
+        });
+    }
+
+    generateLettersGrid(usedLetters) {
+        this.lettersGrid.innerHTML = '';
+        
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        
+        alphabet.forEach(letter => {
+            const letterBtn = document.createElement('button');
+            letterBtn.className = 'letter-btn';
+            letterBtn.textContent = letter;
+            letterBtn.disabled = usedLetters.includes(letter);
+            
+            letterBtn.addEventListener('click', () => this.selectLetter(letter));
+            
+            this.lettersGrid.appendChild(letterBtn);
+        });
+    }
+
+    async selectLetter(letter) {
+        if (!this.isHost) return;
+        
+        try {
+            const roomRef = db.collection('rooms').doc(this.roomCode);
+            await roomRef.update({
+                gameState: GAME_STATES.PLAYING,
+                currentLetter: letter,
+                roundStartTime: new Date(),
+                usedLetters: firebase.firestore.FieldValue.arrayUnion(letter),
+                answers: {} // Reset answers for new round
+            });
+        } catch (error) {
+            console.error('Error selecting letter:', error);
+            showError('Failed to start round. Please try again.');
+        }
+    }
+
+    startTimer() {
+        this.timer = setInterval(() => {
+            this.timeLeft--;
+            this.timerDisplay.textContent = this.timeLeft;
+            
+            // Update timer circle styling
+            const timerCircle = document.querySelector('.timer-circle');
+            if (this.timeLeft <= 10) {
+                timerCircle.classList.add('danger');
+            } else if (this.timeLeft <= 20) {
+                timerCircle.classList.add('warning');
+            }
+            
+            if (this.timeLeft <= 0) {
+                clearInterval(this.timer);
+                this.timer = null;
+                this.submitAnswers(); // Auto-submit when time runs out
+            }
+        }, 1000);
+    }
+
+    async submitAnswers() {
+        const answers = {};
+        const currentLetter = this.currentLetterSpan.textContent;
+        
+        // Collect answers
+        Object.keys(this.answerInputs).forEach(category => {
+            const input = this.answerInputs[category];
+            const answer = input.value.trim();
+            if (answer) {
+                answers[category] = answer;
+            }
+        });
+        
+        try {
+            const roomRef = db.collection('rooms').doc(this.roomCode);
+            await roomRef.update({
+                [`answers.${this.playerName}`]: answers
+            });
+            
+            this.submitAnswersBtn.textContent = 'Answers Submitted';
+            this.submitAnswersBtn.disabled = true;
+            
+            // Disable inputs
+            Object.values(this.answerInputs).forEach(input => {
+                input.disabled = true;
+            });
+            
+        } catch (error) {
+            console.error('Error submitting answers:', error);
+            showError('Failed to submit answers. Please try again.');
+        }
+    }
+
+    generateReviewGrid(roomData) {
+        this.reviewGrid.innerHTML = '';
+        
+        Object.keys(roomData.answers).forEach(player => {
+            const playerAnswers = roomData.answers[player];
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'player-answers';
+            playerDiv.innerHTML = `<h4>${player}'s Answers</h4>`;
+            
+            Object.keys(CATEGORIES).forEach(category => {
+                if (playerAnswers[category]) {
+                    const answerDiv = document.createElement('div');
+                    answerDiv.className = 'answer-review';
+                    answerDiv.innerHTML = `
+                        <div class="answer-text">
+                            <strong>${CATEGORIES[category].label}:</strong> ${playerAnswers[category]}
+                        </div>
+                        <div class="answer-votes">
+                            <button class="vote-btn" data-player="${player}" data-category="${category}" data-vote="correct">✓</button>
+                            <button class="vote-btn" data-player="${player}" data-category="${category}" data-vote="incorrect">✗</button>
