@@ -56,9 +56,7 @@ function createGameState() {
     answers: new Map(), // playerId -> {people, animals, places, things}
     scores: new Map(), // playerId -> totalScore
     gameStatus: 'waiting', // waiting, playing, reviewing, finished
-    roundResults: [],
-    reviewScores: new Map(), // raterId -> { targetId, score }
-    readyPlayers: new Set()
+    roundResults: []
   };
 }
 
@@ -279,14 +277,13 @@ io.on('connection', (socket) => {
       scores: scoresArray,
       letter: gameState.selectedLetter
     });
-
-    // Reset review state and notify clients so they can submit per-player reviews and ready status
-    gameState.reviewScores.clear();
-    gameState.readyPlayers.clear();
-    io.to(roomCode).emit('roundReviewUpdate', {
-      reviewScores: [],
-      readyPlayers: []
-    });
+    
+    // Auto-start next round after 5 seconds
+    setTimeout(() => {
+      if (gameState.gameStatus === 'reviewing') {
+        startNewRound(gameState, roomCode);
+      }
+    }, 5000);
   }
 
   // Start a new round
@@ -330,7 +327,7 @@ io.on('connection', (socket) => {
     });
   }
 
-  // Continue to next round (legacy/override)
+  // Continue to next round
   socket.on('continueRound', () => {
     const playerData = players.get(socket.id);
     if (!playerData) return;
@@ -340,65 +337,6 @@ io.on('connection', (socket) => {
     
     startNewRound(gameState, playerData.roomCode);
   });
-
-  // Submit a per-player review score for the other player
-  socket.on('submitReviewScore', ({ targetPlayerId, score }) => {
-    const playerData = players.get(socket.id);
-    if (!playerData) return;
-
-    const gameState = rooms.get(playerData.roomCode);
-    if (!gameState || gameState.gameStatus !== 'reviewing') return;
-
-    // Store the rating: raterId -> { targetId, score }
-    gameState.reviewScores.set(socket.id, { targetId: targetPlayerId, score });
-
-    // Broadcast update
-    io.to(playerData.roomCode).emit('roundReviewUpdate', {
-      reviewScores: Array.from(gameState.reviewScores.entries()).map(([raterId, obj]) => {
-        const raterName = gameState.players.find(p => p.id === raterId)?.name;
-        const targetName = gameState.players.find(p => p.id === obj.targetId)?.name;
-        return { raterId, raterName, targetId: obj.targetId, targetName, score: obj.score };
-      }),
-      readyPlayers: Array.from(gameState.readyPlayers)
-    });
-
-    // Maybe start next round if everyone has both submitted and is ready
-    checkAndStartNextRound(gameState, playerData.roomCode);
-  });
-
-  // Mark player ready to start next round
-  socket.on('playerReady', () => {
-    const playerData = players.get(socket.id);
-    if (!playerData) return;
-
-    const gameState = rooms.get(playerData.roomCode);
-    if (!gameState || gameState.gameStatus !== 'reviewing') return;
-
-    gameState.readyPlayers.add(socket.id);
-
-    
-    io.to(playerData.roomCode).emit('roundReviewUpdate', {
-      reviewScores: Array.from(gameState.reviewScores.entries()).map(([raterId, obj]) => {
-        const raterName = gameState.players.find(p => p.id === raterId)?.name;
-        const targetName = gameState.players.find(p => p.id === obj.targetId)?.name;
-        return { raterId, raterName, targetId: obj.targetId, targetName, score: obj.score };
-      }),
-      readyPlayers: Array.from(gameState.readyPlayers)
-    });
-
-    checkAndStartNextRound(gameState, playerData.roomCode);
-  });
-
-  // Helper: start next round only when all players have submitted review scores and pressed ready
-  function checkAndStartNextRound(gameState, roomCode) {
-    const numPlayers = gameState.players.length;
-    if (gameState.reviewScores.size >= numPlayers && gameState.readyPlayers.size >= numPlayers) {
-      // Move to next round and clear review state
-      gameState.reviewScores.clear();
-      gameState.readyPlayers.clear();
-      startNewRound(gameState, roomCode);
-    }
-  }
 
   // Disconnect handling
   socket.on('disconnect', () => {
@@ -410,24 +348,10 @@ io.on('connection', (socket) => {
         gameState.scores.delete(socket.id);
         players.delete(socket.id);
         
-        // Clean up review / ready state for disconnected player
-        gameState.reviewScores.delete(socket.id);
-        gameState.readyPlayers.delete(socket.id);
-
         if (gameState.players.length === 0) {
           rooms.delete(playerData.roomCode);
         } else {
           io.to(playerData.roomCode).emit('gameStateUpdate', gameState);
-          if (gameState.gameStatus === 'reviewing') {
-            io.to(playerData.roomCode).emit('roundReviewUpdate', {
-              reviewScores: Array.from(gameState.reviewScores.entries()).map(([raterId, obj]) => {
-                const raterName = gameState.players.find(p => p.id === raterId)?.name;
-                const targetName = gameState.players.find(p => p.id === obj.targetId)?.name;
-                return { raterId, raterName, targetId: obj.targetId, targetName, score: obj.score };
-              }),
-              readyPlayers: Array.from(gameState.readyPlayers)
-            });
-          }
         }
       }
     }

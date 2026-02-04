@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import './RoundReview.css';
 
-nfunction RoundReview({ roundData, playerId, socket }) {
+function RoundReview({ roundData, playerId, onContinue }) {
+  const [autoContinue, setAutoContinue] = useState(true);
   const letter = roundData?.letter || '';
-  const reviewState = roundData?.reviewState || { reviewScores: [], readyPlayers: [] };
-  const [selectedScore, setSelectedScore] = useState(null);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-
-  // Group results by player (existing round scoring)
+  
+  // Group results by player
   const playerResults = {};
   if (roundData?.results) {
     roundData.results.forEach(result => {
@@ -25,33 +22,15 @@ nfunction RoundReview({ roundData, playerId, socket }) {
     });
   }
 
-  // find the other player (for 2-player game)
-  const other = (roundData?.scores || []).find(s => s.playerId !== playerId);
-
+  // Auto-continue after 5 seconds
   useEffect(() => {
-    // Reset local review state whenever a new round review starts
-    setSelectedScore(null);
-    setHasSubmitted(false);
-    setIsReady(false);
-  }, [roundData?.letter]);
-
-  useEffect(() => {
-    // reflect server state locally
-    const myRating = (reviewState.reviewScores || []).find(r => r.raterId === playerId);
-    setHasSubmitted(!!myRating);
-    setSelectedScore(myRating ? myRating.score : null);
-    setIsReady((reviewState.readyPlayers || []).includes(playerId));
-  }, [reviewState, playerId]);
-
-  const submitScore = () => {
-    if (!other) return;
-    if (selectedScore == null) return;
-    socket.emit('submitReviewScore', { targetPlayerId: other.playerId, score: selectedScore });
-  };
-
-  const markReady = () => {
-    socket.emit('playerReady');
-  };
+    if (autoContinue) {
+      const timer = setTimeout(() => {
+        onContinue();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [autoContinue, onContinue]);
 
   const getScoreColor = (points) => {
     if (points === 5) return '#27ae60';
@@ -64,9 +43,6 @@ nfunction RoundReview({ roundData, playerId, socket }) {
     if (points === 2) return '🔄';
     return '❌';
   };
-
-  const submittedCount = reviewState.reviewScores?.length || 0;
-  const readyCount = reviewState.readyPlayers?.length || 0;
 
   return (
     <div className="round-review">
@@ -92,12 +68,12 @@ nfunction RoundReview({ roundData, playerId, socket }) {
                 {playerData.playerName}
                 {pid === playerId && <span className="you-badge">You</span>}
               </h4>
-
+              
               <div className="categories-results">
                 {['people', 'animals', 'places', 'things'].map(category => {
                   const results = playerData.categories[category] || [];
                   const result = results[0]; // Get first result for this category
-
+                  
                   return (
                     <div key={category} className="category-result">
                       <div className="category-label">
@@ -132,48 +108,15 @@ nfunction RoundReview({ roundData, playerId, socket }) {
           ))}
         </div>
 
-        <div className="review-actions">
-          <h4>Rate the other player</h4>
-          {other ? (
-            <div className="rating-row">
-              <div className="rating-target">{other.playerName}</div>
-              <div className="rating-buttons">
-                {[1,2,3,4,5].map(n => (
-                  <button
-                    key={n}
-                    className={`rating-btn ${selectedScore === n ? 'selected' : ''}`}
-                    onClick={() => setSelectedScore(n)}
-                    disabled={hasSubmitted}
-                  >{n}</button>
-                ))}
-              </div>
-              <div className="rating-submit">
-                <button onClick={submitScore} disabled={hasSubmitted || selectedScore == null}>Submit Score</button>
-              </div>
-            </div>
+        <div className="continue-section">
+          {autoContinue ? (
+            <p className="auto-continue-text">Next round starting in 5 seconds...</p>
           ) : (
-            <p>No other player found.</p>
-          )}
-
-          <div className="ready-row">
-            <button className="ready-btn" onClick={markReady} disabled={!hasSubmitted || isReady}>
-              {isReady ? 'Ready (waiting)' : 'Press when ready'}
+            <button className="continue-btn" onClick={onContinue}>
+              Continue to Next Round
             </button>
-            <div className="ready-info">{submittedCount} submitted • {readyCount} ready</div>
-          </div>
-
-          <div className="review-submissions">
-            {(reviewState.reviewScores || []).map(r => (
-              <div key={r.raterId} className="review-item">
-                <span>{r.raterId === playerId ? 'You' : r.raterName}</span>
-                <span>→</span>
-                <span>{r.targetId === playerId ? 'You' : r.targetName}</span>
-                <span className="review-score">{r.score}</span>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
-
       </div>
     </div>
   );
