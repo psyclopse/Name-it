@@ -55,8 +55,9 @@ function createGameState() {
     roundDuration: 35000, // 35 seconds
     answers: new Map(), // playerId -> {people, animals, places, things}
     scores: new Map(), // playerId -> totalScore
-    gameStatus: 'waiting', // waiting, playing, reviewing, finished
-    roundResults: []
+    gameStatus: 'waiting', // waiting, playing, grading, reviewing, finished
+    roundResults: [],
+    grades: new Map(), // graderId -> { targetPlayerId -> { category -> points } }
   };
 }
 
@@ -95,7 +96,7 @@ io.on('connection', (socket) => {
       return;
     }
     
-    if (gameState.gameStatus === 'playing' || gameState.gameStatus === 'reviewing') {
+    if (gameState.gameStatus === 'playing' || gameState.gameStatus === 'grading' || gameState.gameStatus === 'reviewing') {
       socket.emit('joinError', { message: 'Game already in progress' });
       return;
     }
@@ -257,33 +258,26 @@ io.on('connection', (socket) => {
     return results;
   }
 
-  // End round and calculate scores
+  // End round and transition to grading phase
   function endRound(gameState, roomCode) {
     if (gameState.gameStatus !== 'playing') return;
     
-    gameState.gameStatus = 'reviewing';
-    const roundResults = calculateScores(gameState);
-    gameState.roundResults = roundResults;
+    gameState.gameStatus = 'grading';
+    gameState.grades.clear();
     
-    // Convert scores map to array for transmission
-    const scoresArray = Array.from(gameState.scores.entries()).map(([id, score]) => ({
-      playerId: id,
-      playerName: gameState.players.find(p => p.id === id)?.name,
-      score
-    }));
+    // Send all answers to both players for grading
+    const allAnswers = {};
+    for (const [playerId, answers] of gameState.answers.entries()) {
+      allAnswers[playerId] = {
+        playerName: gameState.players.find(p => p.id === playerId)?.name,
+        answers: answers
+      };
+    }
     
-    io.to(roomCode).emit('roundEnded', {
-      results: roundResults,
-      scores: scoresArray,
-      letter: gameState.selectedLetter
+    io.to(roomCode).emit('startGrading', {
+      letter: gameState.selectedLetter,
+      allAnswers: allAnswers
     });
-    
-    // Auto-start next round after 5 seconds
-    setTimeout(() => {
-      if (gameState.gameStatus === 'reviewing') {
-        startNewRound(gameState, roomCode);
-      }
-    }, 5000);
   }
 
   // Start a new round
@@ -327,16 +321,110 @@ io.on('connection', (socket) => {
     });
   }
 
-  // Continue to next round
-  socket.on('continueRound', () => {
+  // Submit grades for opponent's answers
+  socket.on('submitGrades', ({ grades }) => {
     const playerData = players.get(socket.id);
     if (!playerData) return;
     
     const gameState = rooms.get(playerData.roomCode);
-    if (!gameState || gameState.gameStatus !== 'reviewing') return;
+    if (!gameState || gameState.gameStatus !== 'grading') return;
     
-    startNewRound(gameState, playerData.roomCode);
+    // Store grades from this player
+    gameState.grades.set(socket.id, grades);
+    
+    // Check if all players have submitted grades
+    const allGraded = gameState.players.every(p => gameState.grades.has(p.id));
+    
+    if (allGraded) {
+      // Calculate final scores based on all submitted grades
+      calculateScoresFromGrades(gameState);
+      finishRound(gameState, playerData.roomCode);
+    }
   });
+
+  // Calculate scores based on submitted grades
+  function calculateScoresFromGrades(gameState) {
+    const results = [];
+    const categories = ['people', 'animals', 'places', 'things'];
+    
+    for (const category of categories) {
+      // Get all unique answers for this category
+      const categoryAnswers = new Map();
+      
+      for (const [playerId, answers] of gameState.answers.entries()) {
+        const answer = answers[category].toLowerCase().trim();
+        if (!answer) continue;
+        
+        if (!categoryAnswers.has(answer)) {
+          categoryAnswers.set(answer, []);
+        }
+        categoryAnswers.get(answer).push(playerId);
+      }
+      
+      // Calculate points for each answer based on grades
+      for (const [answer, playerIds] of categoryAnswers.entries()) {
+        for (const playerId of playerIds) {
+          let totalPoints = 0;
+          let graderCount = 0;
+          
+          // Sum up grades from all other players
+          for (const [graderId, playerGrades] of gameState.grades.entries()) {
+            if (graderId !== playerId && playerGrades[playerId] && playerGrades[playerId][category]) {
+              totalPoints += playerGrades[playerId][category];
+              graderCount++;
+            }
+          }
+          
+          // Average the points if multiple graders (round down)
+          let points = graderCount > 0 ? Math.floor(totalPoints / graderCount) : 0;
+          
+          const currentScore = gameState.scores.get(playerId) || 0;
+          gameState.scores.set(playerId, currentScore + points);
+          
+          const player = gameState.players.find(p => p.id === playerId);
+          if (player) {
+            player.score = gameState.scores.get(playerId);
+          }
+          
+          results.push({
+            playerId,
+            playerName: gameState.players.find(p => p.id === playerId)?.name,
+            category,
+            answer,
+            points,
+            isShared: playerIds.length > 1
+          });
+        }
+      }
+    }
+    
+    gameState.roundResults = results;
+  }
+
+  // Finish round and show review
+  function finishRound(gameState, roomCode) {
+    gameState.gameStatus = 'reviewing';
+    
+    // Convert scores map to array for transmission
+    const scoresArray = Array.from(gameState.scores.entries()).map(([id, score]) => ({
+      playerId: id,
+      playerName: gameState.players.find(p => p.id === id)?.name,
+      score
+    }));
+    
+    io.to(roomCode).emit('roundEnded', {
+      results: gameState.roundResults,
+      scores: scoresArray,
+      letter: gameState.selectedLetter
+    });
+    
+    // Auto-start next round after 5 seconds
+    setTimeout(() => {
+      if (gameState.gameStatus === 'reviewing') {
+        startNewRound(gameState, roomCode);
+      }
+    }, 5000);
+  }
 
   // Disconnect handling
   socket.on('disconnect', () => {

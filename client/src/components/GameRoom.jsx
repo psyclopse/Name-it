@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import WaitingRoom from './WaitingRoom';
 import RoundSelection from './RoundSelection';
 import RoundPlaying from './RoundPlaying';
+import GradingPhase from './GradingPhase';
 import RoundReview from './RoundReview';
 import GameFinished from './GameFinished';
 import './GameRoom.css';
 import './ErrorToast.css';
 
 function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToLobby }) {
-  const [currentScreen, setCurrentScreen] = useState('waiting'); // waiting, selection, playing, review, finished
+  const [currentScreen, setCurrentScreen] = useState('waiting'); // waiting, selection, playing, grading, review, finished
   const [roundData, setRoundData] = useState(null);
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState(null);
@@ -49,6 +50,11 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       setTimer(0);
     });
 
+    socket.on('startGrading', (data) => {
+      setCurrentScreen('grading');
+      setRoundData(data);
+    });
+
     socket.on('gameFinished', (data) => {
       setCurrentScreen('finished');
       setRoundData(data);
@@ -62,6 +68,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       socket.off('roundReady');
       socket.off('roundStarted');
       socket.off('roundEnded');
+      socket.off('startGrading');
       socket.off('gameFinished');
       socket.off('answerSubmitted');
       socket.off('error');
@@ -78,6 +85,10 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
 
   const handleSubmitAnswers = (answers) => {
     socket.emit('submitAnswers', answers);
+  };
+
+  const handleSubmitGrades = (grades) => {
+    socket.emit('submitGrades', { grades });
   };
 
   const handleContinueRound = () => {
@@ -121,6 +132,16 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
         playerId={playerId}
         playerName={playerName}
         onSubmitAnswers={handleSubmitAnswers}
+      />
+    );
+  }
+
+  if (currentScreen === 'grading') {
+    return (
+      <GradingPhase
+        roundData={roundData}
+        playerId={playerId}
+        onSubmitGrades={handleSubmitGrades}
       />
     );
   }
