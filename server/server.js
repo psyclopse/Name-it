@@ -58,6 +58,7 @@ function createGameState() {
     gameStatus: 'waiting', // waiting, playing, grading, reviewing, finished
     roundResults: [],
     grades: new Map(), // graderId -> { targetPlayerId -> { category -> points } }
+    proceed: new Set(), // players who pressed proceed after review
   };
 }
 
@@ -310,6 +311,10 @@ io.on('connection', (socket) => {
     gameState.selectedLetter = null;
     gameState.roundStartTime = null;
     gameState.answers.clear();
+    gameState.grades.clear();
+    if (gameState.proceed && typeof gameState.proceed.clear === 'function') {
+      gameState.proceed.clear();
+    }
     
     io.to(roomCode).emit('roundReady', {
       round: gameState.currentRound,
@@ -424,14 +429,24 @@ io.on('connection', (socket) => {
       scores: scoresArray,
       letter: gameState.selectedLetter
     });
-    
-    // Auto-start next round after 5 seconds
-    setTimeout(() => {
-      if (gameState.gameStatus === 'reviewing') {
-        startNewRound(gameState, roomCode);
-      }
-    }, 5000);
   }
+
+  // Continue handling: wait for all players to press proceed
+  socket.on('pressProceed', () => {
+    const playerData = players.get(socket.id);
+    if (!playerData) return;
+
+    const gameState = rooms.get(playerData.roomCode);
+    if (!gameState || gameState.gameStatus !== 'reviewing') return;
+
+    gameState.proceed.add(socket.id);
+    const allProceed = gameState.players.every(p => gameState.proceed.has(p.id));
+    if (allProceed) {
+      // clear proceed flags and start next round
+      gameState.proceed.clear();
+      startNewRound(gameState, playerData.roomCode);
+    }
+  });
 
   // Disconnect handling
   socket.on('disconnect', () => {

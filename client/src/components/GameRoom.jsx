@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import WaitingRoom from './WaitingRoom';
 import RoundSelection from './RoundSelection';
 import RoundPlaying from './RoundPlaying';
-import GradingPhase from './GradingPhase';
 import RoundReview from './RoundReview';
 import GameFinished from './GameFinished';
 import './GameRoom.css';
@@ -52,7 +51,8 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
 
     socket.on('startGrading', (data) => {
       console.log('startGrading event received:', data);
-      setCurrentScreen('grading');
+      // Show grading UI on the review screen
+      setCurrentScreen('review');
       setRoundData(data);
     });
 
@@ -93,7 +93,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
   };
 
   const handleContinueRound = () => {
-    socket.emit('continueRound');
+    socket.emit('pressProceed');
   };
 
   if (currentScreen === 'waiting') {
@@ -137,22 +137,13 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     );
   }
 
-  if (currentScreen === 'grading') {
-    return (
-      <GradingPhase
-        roundData={roundData}
-        playerId={playerId}
-        onSubmitGrades={handleSubmitGrades}
-      />
-    );
-  }
-
   if (currentScreen === 'review') {
     return (
       <RoundReview
         roundData={roundData}
         playerId={playerId}
         onContinue={handleContinueRound}
+        onSubmitGrades={handleSubmitGrades}
       />
     );
   }
