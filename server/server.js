@@ -141,12 +141,6 @@ io.on('connection', (socket) => {
     
     const gameState = rooms.get(playerData.roomCode);
     if (!gameState || gameState.gameStatus !== 'playing') return;
-
-    // Enforce that only the designated selector for this round can pick a letter
-    if (gameState.currentSelectorId && gameState.currentSelectorId !== socket.id) {
-      socket.emit('error', { message: 'Only the designated player can select a letter this round' });
-      return;
-    }
     
     // Check if a letter is already selected for this round
     if (gameState.selectedLetter) {
@@ -320,27 +314,11 @@ io.on('connection', (socket) => {
     gameState.selectedLetter = null;
     gameState.roundStartTime = null;
     gameState.answers.clear();
-
-    // Determine which player gets to select the letter this round.
-    // The room creator selects first (round 1), then players take turns
-    // in the order they joined the room.
-    let selectorPlayer = null;
-    if (gameState.players.length > 0) {
-      // Rotate through players starting with the creator (index 0)
-      // Round 1: index 0 (creator), Round 2: index 1, Round 3: index 2, etc.
-      const selectorIndex = (gameState.currentRound - 1) % gameState.players.length;
-      selectorPlayer = gameState.players[selectorIndex];
-      gameState.currentSelectorId = selectorPlayer.id;
-    } else {
-      gameState.currentSelectorId = null;
-    }
     
     io.to(roomCode).emit('roundReady', {
       round: gameState.currentRound,
       usedLetters: gameState.usedLetters,
       availableLetters,
-      selectorId: selectorPlayer ? selectorPlayer.id : null,
-      selectorName: selectorPlayer ? selectorPlayer.name : null,
       scores: Array.from(gameState.scores.entries()).map(([id, score]) => ({
         playerId: id,
         playerName: gameState.players.find(p => p.id === id)?.name,
