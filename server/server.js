@@ -262,6 +262,7 @@ io.on('connection', (socket) => {
   function endRound(gameState, roomCode) {
     if (gameState.gameStatus !== 'playing') return;
     
+    console.log('endRound called, transitioning to grading phase');
     gameState.gameStatus = 'grading';
     gameState.grades.clear();
     
@@ -274,6 +275,7 @@ io.on('connection', (socket) => {
       };
     }
     
+    console.log('Emitting startGrading event with answers:', allAnswers);
     io.to(roomCode).emit('startGrading', {
       letter: gameState.selectedLetter,
       allAnswers: allAnswers
@@ -329,14 +331,19 @@ io.on('connection', (socket) => {
     const gameState = rooms.get(playerData.roomCode);
     if (!gameState || gameState.gameStatus !== 'grading') return;
     
+    console.log('submitGrades received from player:', socket.id, 'grades:', grades);
+    
     // Store grades from this player
     gameState.grades.set(socket.id, grades);
     
     // Check if all players have submitted grades
     const allGraded = gameState.players.every(p => gameState.grades.has(p.id));
     
+    console.log('Grades submitted by:', socket.id, 'All graded:', allGraded, 'Total players:', gameState.players.length, 'Grades count:', gameState.grades.size);
+    
     if (allGraded) {
       // Calculate final scores based on all submitted grades
+      console.log('All players have graded, calculating scores...');
       calculateScoresFromGrades(gameState);
       finishRound(gameState, playerData.roomCode);
     }

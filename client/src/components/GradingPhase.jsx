@@ -45,6 +45,7 @@ function GradingPhase({ roundData, playerId, onSubmitGrades }) {
       return;
     }
 
+    console.log('Submitting grades:', grades);
     onSubmitGrades(grades);
     setSubmitted(true);
   };

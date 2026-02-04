@@ -51,6 +51,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     });
 
     socket.on('startGrading', (data) => {
+      console.log('startGrading event received:', data);
       setCurrentScreen('grading');
       setRoundData(data);
     });
