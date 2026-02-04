@@ -49,6 +49,11 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       setTimer(0);
     });
 
+    // Review updates: who's submitted a review and who's ready
+    socket.on('roundReviewUpdate', (data) => {
+      setRoundData(prev => ({ ...(prev || {}), reviewState: data }));
+    });
+
     socket.on('gameFinished', (data) => {
       setCurrentScreen('finished');
       setRoundData(data);
@@ -62,6 +67,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       socket.off('roundReady');
       socket.off('roundStarted');
       socket.off('roundEnded');
+      socket.off('roundReviewUpdate');
       socket.off('gameFinished');
       socket.off('answerSubmitted');
       socket.off('error');
@@ -130,7 +136,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       <RoundReview
         roundData={roundData}
         playerId={playerId}
-        onContinue={handleContinueRound}
+        socket={socket}
       />
     );
   }
