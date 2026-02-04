@@ -4,8 +4,8 @@ import './RoundSelection.css';
 function RoundSelection({ roundData, playerId, onSelectLetter }) {
   const [selectedLetter, setSelectedLetter] = useState(null);
   
-  // Any player can select a letter
-  const canSelect = true;
+  // Only the designated selector for this round can choose a letter
+  const canSelect = roundData?.selectorId === playerId;
 
   const handleLetterClick = (letter) => {
     if (!canSelect || roundData.usedLetters.includes(letter)) return;
@@ -58,7 +58,9 @@ function RoundSelection({ roundData, playerId, onSelectLetter }) {
             </>
           ) : (
             <div className="waiting-selection">
-              <p>Waiting for a player to select a letter...</p>
+              <p>
+                Waiting for {roundData?.selectorName || 'another player'} to select a letter...
+              </p>
             </div>
           )}
         </div>
