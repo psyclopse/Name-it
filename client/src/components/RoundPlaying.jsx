@@ -11,6 +11,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
   const [submitted, setSubmitted] = useState(false);
   const submittedRef = useRef(false); // Use ref to track submission to avoid state staling
   const answersRef = useRef(answers); // Keep ref in sync with current answers
+  const prevRoundNumberRef = useRef(null); // Track previous round to detect actual changes
 
   const letter = roundData?.letter || '';
   const roundNumber = roundData?.round ?? null;
@@ -42,17 +43,21 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     }
   }, [timer]);
 
-  // Reset for each new round (not for grading phase)
+  // Reset for each new round (only when round number actually changes)
   useEffect(() => {
-    console.log('New round started - round number:', roundNumber);
-    submittedRef.current = false;
-    setSubmitted(false);
-    setAnswers({
-      people: '',
-      animals: '',
-      places: '',
-      things: ''
-    });
+    // Only reset if we have a new round number that's different from the previous one
+    if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current) {
+      console.log('New round started - round number changed from', prevRoundNumberRef.current, 'to', roundNumber);
+      prevRoundNumberRef.current = roundNumber;
+      submittedRef.current = false;
+      setSubmitted(false);
+      setAnswers({
+        people: '',
+        animals: '',
+        places: '',
+        things: ''
+      });
+    }
   }, [roundNumber]);
 
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
