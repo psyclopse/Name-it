@@ -53,6 +53,7 @@ function createGameState() {
     usedLetters: [],
     roundStartTime: null,
     roundDuration: 35000, // 35 seconds
+    roundTimerId: null, // Store timer so we can cancel when round ends early
     answers: new Map(), // playerId -> {people, animals, places, things}
     scores: new Map(), // playerId -> totalScore
     gameStatus: 'waiting', // waiting, playing, grading, reviewing, finished
@@ -161,15 +162,21 @@ io.on('connection', (socket) => {
     gameState.roundStartTime = Date.now();
     gameState.answers.clear();
     
+    // Clear any existing round timer (e.g. from previous round)
+    if (gameState.roundTimerId) {
+      clearTimeout(gameState.roundTimerId);
+    }
+    
     io.to(playerData.roomCode).emit('roundStarted', {
       letter,
       startTime: gameState.roundStartTime,
       duration: gameState.roundDuration
     });
     
-    // Auto-advance to review after timer
-    setTimeout(() => {
-      if (gameState.selectedLetter === letter) {
+    // Auto-advance to grading after timer
+    gameState.roundTimerId = setTimeout(() => {
+      gameState.roundTimerId = null;
+      if (gameState.gameStatus === 'playing' && gameState.selectedLetter === letter) {
         endRound(gameState, playerData.roomCode);
       }
     }, gameState.roundDuration);
@@ -263,9 +270,16 @@ io.on('connection', (socket) => {
   function endRound(gameState, roomCode) {
     if (gameState.gameStatus !== 'playing') return;
     
+    // Cancel the round timer (round may have ended early when all submitted)
+    if (gameState.roundTimerId) {
+      clearTimeout(gameState.roundTimerId);
+      gameState.roundTimerId = null;
+    }
+    
     console.log('endRound called, transitioning to grading phase');
     gameState.gameStatus = 'grading';
     gameState.grades.clear();
+    gameState.proceed.clear(); // Ensure proceed set is fresh for when we reach reviewing
     
     // Send all answers to both players for grading
     const allAnswers = {};
@@ -278,6 +292,7 @@ io.on('connection', (socket) => {
     
     console.log('Emitting startGrading event with answers:', allAnswers);
     io.to(roomCode).emit('startGrading', {
+      round: gameState.currentRound,
       letter: gameState.selectedLetter,
       allAnswers: allAnswers
     });
@@ -425,6 +440,7 @@ io.on('connection', (socket) => {
     }));
     
     io.to(roomCode).emit('roundEnded', {
+      round: gameState.currentRound,
       results: gameState.roundResults,
       scores: scoresArray,
       letter: gameState.selectedLetter

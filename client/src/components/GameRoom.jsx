@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import WaitingRoom from './WaitingRoom';
 import RoundSelection from './RoundSelection';
 import RoundPlaying from './RoundPlaying';
@@ -10,6 +10,7 @@ import './ErrorToast.css';
 function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToLobby }) {
   const [currentScreen, setCurrentScreen] = useState('waiting'); // waiting, selection, playing, grading, review, finished
   const [roundData, setRoundData] = useState(null);
+  const gradingRoundRef = useRef(null); // Round we're grading - used to ignore stale roundEnded events
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState(null);
 
@@ -19,6 +20,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       setTimeout(() => setError(null), 5000);
     });
     socket.on('roundReady', (data) => {
+      gradingRoundRef.current = null;
       setCurrentScreen('selection');
       setRoundData(data);
     });
@@ -44,6 +46,12 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     });
 
     socket.on('roundEnded', (data) => {
+      // Ignore stale roundEnded from a previous round (e.g. delayed network) that would overwrite grading UI
+      const currentGradingRound = gradingRoundRef.current;
+      if (currentGradingRound != null && data.round != null && data.round !== currentGradingRound) {
+        return;
+      }
+      gradingRoundRef.current = null;
       setCurrentScreen('review');
       setRoundData(data);
       setTimer(0);
@@ -51,7 +59,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
 
     socket.on('startGrading', (data) => {
       console.log('startGrading event received:', data);
-      // Show grading UI on the review screen
+      gradingRoundRef.current = data.round ?? null;
       setCurrentScreen('review');
       setRoundData(data);
     });
