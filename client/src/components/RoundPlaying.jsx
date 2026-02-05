@@ -15,6 +15,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
 
   const letter = roundData?.letter || '';
   const roundNumber = roundData?.round ?? null;
+  const isGradingPhase = !!roundData?.allAnswers; // True if we're in grading phase
 
   const handleChange = (category, value) => {
     if (submitted) return;
@@ -43,12 +44,14 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     }
   }, [timer]);
 
-  // Reset for each new round (only when starting a fresh playing phase, not transitioning to grading)
+  // Reset for each new playing round (not during grading phase)
   useEffect(() => {
-    // Only reset if we have a new round number that's different from the previous one
-    // AND we haven't submitted yet in this phase (to avoid resetting during grading transition)
-    if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current && !submittedRef.current) {
-      console.log('New playing round started - round number changed from', prevRoundNumberRef.current, 'to', roundNumber);
+    // Only reset when:
+    // 1. We have a valid round number
+    // 2. Round number changed from previous
+    // 3. We're NOT in grading phase (allAnswers will be present during grading)
+    if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current && !isGradingPhase) {
+      console.log('New playing round started - round number changed from', prevRoundNumberRef.current, 'to', roundNumber, '(grading:', isGradingPhase, ')');
       prevRoundNumberRef.current = roundNumber;
       submittedRef.current = false;
       setSubmitted(false);
@@ -59,7 +62,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
         things: ''
       });
     }
-  }, [roundNumber]);
+  }, [roundNumber, isGradingPhase]);
 
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 
