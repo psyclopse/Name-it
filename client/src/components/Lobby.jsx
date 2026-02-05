@@ -22,7 +22,7 @@ function Lobby({ onCreateRoom, onJoinRoom, error }) {
     <div className="lobby">
       <div className="lobby-card">
         <h1 className="lobby-title"> Name It </h1>
-        <p className="lobby-subtitle">Idk sha</p>
+        <p className="lobby-subtitle">omo idk sha</p>
 
         <div className="mode-toggle">
           <button
