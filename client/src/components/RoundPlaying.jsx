@@ -13,6 +13,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
   const answersRef = useRef(answers); // Keep ref in sync with current answers
 
   const letter = roundData?.letter || '';
+  const roundNumber = roundData?.round ?? null;
 
   const handleChange = (category, value) => {
     if (submitted) return;
@@ -41,9 +42,9 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     }
   }, [timer]);
 
-  // Reset for each new round
+  // Reset for each new round (not for grading phase)
   useEffect(() => {
-    console.log('New round started with letter:', letter);
+    console.log('New round started - round number:', roundNumber);
     submittedRef.current = false;
     setSubmitted(false);
     setAnswers({
@@ -52,7 +53,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
       places: '',
       things: ''
     });
-  }, [letter]);
+  }, [roundNumber]);
 
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 
