@@ -46,12 +46,14 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
 
   // Reset for each new playing round (not during grading phase)
   useEffect(() => {
+    console.log('Reset effect triggered - roundNumber:', roundNumber, 'prevRound:', prevRoundNumberRef.current, 'isGrading:', isGradingPhase, 'submittedRef:', submittedRef.current);
+    
     // Only reset when:
     // 1. We have a valid round number
     // 2. Round number changed from previous
     // 3. We're NOT in grading phase (allAnswers will be present during grading)
     if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current && !isGradingPhase) {
-      console.log('New playing round started - round number changed from', prevRoundNumberRef.current, 'to', roundNumber, '(grading:', isGradingPhase, ')');
+      console.log('CONDITIONS MET - Resetting for new playing round:', roundNumber);
       prevRoundNumberRef.current = roundNumber;
       submittedRef.current = false;
       setSubmitted(false);
@@ -61,6 +63,8 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
         places: '',
         things: ''
       });
+    } else {
+      console.log('CONDITIONS NOT MET - roundNumber !== null?', roundNumber !== null, '| changed?', roundNumber !== prevRoundNumberRef.current, '| !isGrading?', !isGradingPhase);
     }
   }, [roundNumber, isGradingPhase]);
 
