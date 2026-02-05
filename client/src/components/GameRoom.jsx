@@ -30,12 +30,12 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       setCurrentScreen('playing');
       setRoundData(data);
 
-      // Start a local 35-second countdown when the round starts
+      // Start a local 37-second countdown when the round starts
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
-      setTimer(35);
+      setTimer(37);
       timerIntervalRef.current = setInterval(() => {
         setTimer(prev => {
           const next = Math.max(0, prev - 1);
