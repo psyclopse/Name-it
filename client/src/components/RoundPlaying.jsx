@@ -23,9 +23,9 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     setSubmitted(true);
   };
 
-  // auto-submit player's answers when the timer reaches 2 (if not already submitted)
+  // auto-submit player's answers when the timer reaches 0 (if not already submitted)
   useEffect(() => {
-    if (!submitted && typeof timer === 'number' && timer === 2) {
+    if (!submitted && typeof timer === 'number' && timer <= 0) {
       handleSubmit();
     }
   }, [timer, submitted]);
