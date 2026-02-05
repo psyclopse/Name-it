@@ -43,11 +43,12 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     }
   }, [timer]);
 
-  // Reset for each new round (only when round number actually changes)
+  // Reset for each new round (only when starting a fresh playing phase, not transitioning to grading)
   useEffect(() => {
     // Only reset if we have a new round number that's different from the previous one
-    if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current) {
-      console.log('New round started - round number changed from', prevRoundNumberRef.current, 'to', roundNumber);
+    // AND we haven't submitted yet in this phase (to avoid resetting during grading transition)
+    if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current && !submittedRef.current) {
+      console.log('New playing round started - round number changed from', prevRoundNumberRef.current, 'to', roundNumber);
       prevRoundNumberRef.current = roundNumber;
       submittedRef.current = false;
       setSubmitted(false);
