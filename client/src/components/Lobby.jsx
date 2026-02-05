@@ -21,8 +21,8 @@ function Lobby({ onCreateRoom, onJoinRoom, error }) {
   return (
     <div className="lobby">
       <div className="lobby-card">
-        <h1 className="lobby-title">🎮 Name It Game</h1>
-        <p className="lobby-subtitle">Test your knowledge and creativity!</p>
+        <h1 className="lobby-title"> Name It </h1>
+        <p className="lobby-subtitle">Idk sha</p>
 
         <div className="mode-toggle">
           <button
