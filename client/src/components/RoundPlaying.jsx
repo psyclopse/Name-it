@@ -37,9 +37,11 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     // Only auto-submit if timer is 0 AND we've seen a higher value (timer was counting down)
     if (timer === 0 && !submitted && !autoSubmittedRef.current && maxTimerRef.current !== null && maxTimerRef.current > 0) {
       autoSubmittedRef.current = true;
-      handleSubmit();
+      // Submit with current answers state
+      onSubmitAnswers(answers);
+      setSubmitted(true);
     }
-  }, [timer]);
+  }, [timer, answers, submitted, onSubmitAnswers]);
 
   // Reset auto-submit flag and timer tracker when a new round starts
   useEffect(() => {
