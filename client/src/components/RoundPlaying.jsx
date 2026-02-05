@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import './RoundPlaying.css';
 
 function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers }) {
@@ -9,13 +9,8 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     things: ''
   });
   const [submitted, setSubmitted] = useState(false);
-  const submittedRef = useRef(false); // Use ref to track submission to avoid state staling
-  const answersRef = useRef(answers); // Keep ref in sync with current answers
-  const prevRoundNumberRef = useRef(null); // Track previous round to detect actual changes
 
   const letter = roundData?.letter || '';
-  const roundNumber = roundData?.round ?? null;
-  const isGradingPhase = !!roundData?.allAnswers; // True if we're in grading phase
 
   const handleChange = (category, value) => {
     if (submitted) return;
@@ -23,50 +18,10 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
   };
 
   const handleSubmit = () => {
-    if (submittedRef.current) return;
-    console.log('Submitting answers:', answersRef.current);
-    submittedRef.current = true;
-    onSubmitAnswers(answersRef.current);
+    if (submitted) return;
+    onSubmitAnswers(answers);
     setSubmitted(true);
   };
-
-  // Keep answers ref in sync
-  useEffect(() => {
-    answersRef.current = answers;
-  }, [answers]);
-
-  // Auto-submit when timer reaches 0 - only depend on timer
-  useEffect(() => {
-    console.log('Timer update:', timer, 'submitted:', submittedRef.current);
-    if (timer === 0 && !submittedRef.current) {
-      console.log('Timer reached 0, auto-submitting with answers:', answersRef.current);
-      handleSubmit();
-    }
-  }, [timer]);
-
-  // Reset for each new playing round (not during grading phase)
-  useEffect(() => {
-    console.log('Reset effect triggered - roundNumber:', roundNumber, 'prevRound:', prevRoundNumberRef.current, 'isGrading:', isGradingPhase, 'submittedRef:', submittedRef.current);
-    
-    // Only reset when:
-    // 1. We have a valid round number
-    // 2. Round number changed from previous
-    // 3. We're NOT in grading phase (allAnswers will be present during grading)
-    if (roundNumber !== null && roundNumber !== prevRoundNumberRef.current && !isGradingPhase) {
-      console.log('CONDITIONS MET - Resetting for new playing round:', roundNumber);
-      prevRoundNumberRef.current = roundNumber;
-      submittedRef.current = false;
-      setSubmitted(false);
-      setAnswers({
-        people: '',
-        animals: '',
-        places: '',
-        things: ''
-      });
-    } else {
-      console.log('CONDITIONS NOT MET - roundNumber !== null?', roundNumber !== null, '| changed?', roundNumber !== prevRoundNumberRef.current, '| !isGrading?', !isGradingPhase);
-    }
-  }, [roundNumber, isGradingPhase]);
 
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 

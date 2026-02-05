@@ -11,7 +11,6 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
   const [currentScreen, setCurrentScreen] = useState('waiting'); // waiting, selection, playing, grading, review, finished
   const [roundData, setRoundData] = useState(null);
   const gradingRoundRef = useRef(null); // Round we're grading - used to ignore stale roundEnded events
-  const timerIntervalRef = useRef(null); // Track timer interval to clean up properly
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState(null);
 
@@ -32,22 +31,18 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       const startTime = data.startTime;
       const duration = data.duration;
       
-      // Clear any existing timer interval
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-      
-      // Update timer every 100ms
-      timerIntervalRef.current = setInterval(() => {
+      // Update timer every second
+      const interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
         setTimer(remaining);
         
         if (remaining === 0) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
+          clearInterval(interval);
         }
       }, 100);
+
+      return () => clearInterval(interval);
     });
 
     socket.on('roundEnded', (data) => {
@@ -87,7 +82,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       socket.off('answerSubmitted');
       socket.off('error');
     };
-  }, []);
+  }, [socket]);
 
   const handleStartGame = () => {
     socket.emit('startGame');
