@@ -10,6 +10,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
   });
   const [submitted, setSubmitted] = useState(false);
   const autoSubmittedRef = useRef(false); // Track if we've already auto-submitted
+  const maxTimerRef = useRef(null); // Track the max timer value seen to detect if timer is counting down
 
   const letter = roundData?.letter || '';
 
@@ -24,17 +25,26 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     setSubmitted(true);
   };
 
-  // Auto-submit when timer reaches 0 (only once)
+  // Auto-submit when timer reaches 0 (only once, and only after timer has actually counted down)
   useEffect(() => {
-    if (timer === 0 && !submitted && !autoSubmittedRef.current) {
+    // Track the max timer value to detect if we're in an active round
+    if (timer > 0) {
+      if (maxTimerRef.current === null || timer > maxTimerRef.current) {
+        maxTimerRef.current = timer;
+      }
+    }
+    
+    // Only auto-submit if timer is 0 AND we've seen a higher value (timer was counting down)
+    if (timer === 0 && !submitted && !autoSubmittedRef.current && maxTimerRef.current !== null && maxTimerRef.current > 0) {
       autoSubmittedRef.current = true;
       handleSubmit();
     }
   }, [timer]);
 
-  // Reset auto-submit flag when a new round starts
+  // Reset auto-submit flag and timer tracker when a new round starts
   useEffect(() => {
     autoSubmittedRef.current = false;
+    maxTimerRef.current = null;
     setSubmitted(false);
   }, [roundData?.letter]);
 
