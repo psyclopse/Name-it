@@ -9,8 +9,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     things: ''
   });
   const [submitted, setSubmitted] = useState(false);
-  const autoSubmittedRef = useRef(false); // Track if we've already auto-submitted
-  const maxTimerRef = useRef(null); // Track the max timer value seen to detect if timer is counting down
+  const submittedRef = useRef(false); // Use ref to track submission to avoid state staling
 
   const letter = roundData?.letter || '';
 
@@ -20,35 +19,26 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
   };
 
   const handleSubmit = () => {
-    if (submitted) return;
+    if (submittedRef.current) return;
+    console.log('Submitting answers:', answers);
+    submittedRef.current = true;
     onSubmitAnswers(answers);
     setSubmitted(true);
   };
 
-  // Auto-submit when timer reaches 0 (only once, and only after timer has actually counted down)
+  // Auto-submit when timer reaches 0
   useEffect(() => {
-    // Track the max timer value to detect if we're in an active round
-    if (timer > 0) {
-      if (maxTimerRef.current === null || timer > maxTimerRef.current) {
-        maxTimerRef.current = timer;
-      }
+    console.log('Timer update:', timer, 'submitted:', submittedRef.current);
+    if (timer === 0 && !submittedRef.current) {
+      console.log('Timer reached 0, auto-submitting with answers:', answers);
+      handleSubmit();
     }
-    
-    // Only auto-submit if timer is 0 AND we've seen a higher value (timer was counting down)
-    if (timer === 0 && !submitted && !autoSubmittedRef.current && maxTimerRef.current !== null && maxTimerRef.current > 0) {
-      console.log('Auto-submitting answers:', answers);
-      autoSubmittedRef.current = true;
-      // Submit with current answers state
-      onSubmitAnswers(answers);
-      setSubmitted(true);
-    }
-  }, [timer, answers, submitted, onSubmitAnswers]);
+  }, [timer, answers]);
 
-  // Reset auto-submit flag and timer tracker when a new round starts
+  // Reset for each new round
   useEffect(() => {
-    console.log('Resetting auto-submit for new round:', roundData?.letter);
-    autoSubmittedRef.current = false;
-    maxTimerRef.current = null;
+    console.log('New round started with letter:', letter);
+    submittedRef.current = false;
     setSubmitted(false);
     setAnswers({
       people: '',
@@ -56,7 +46,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
       places: '',
       things: ''
     });
-  }, [roundData?.letter]);
+  }, [letter]);
 
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 
