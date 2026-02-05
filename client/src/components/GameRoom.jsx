@@ -87,7 +87,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       socket.off('answerSubmitted');
       socket.off('error');
     };
-  }, [socket]);
+  }, []);
 
   const handleStartGame = () => {
     socket.emit('startGame');
