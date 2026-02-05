@@ -23,6 +23,13 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     setSubmitted(true);
   };
 
+  // Auto-submit when timer reaches 0
+  useEffect(() => {
+    if (timer === 0 && !submitted) {
+      handleSubmit();
+    }
+  }, [timer, submitted]);
+
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 
   return (
