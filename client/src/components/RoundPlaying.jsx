@@ -10,6 +10,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
   });
   const [submitted, setSubmitted] = useState(false);
   const submittedRef = useRef(false); // Use ref to track submission to avoid state staling
+  const answersRef = useRef(answers); // Keep ref in sync with current answers
 
   const letter = roundData?.letter || '';
 
@@ -20,20 +21,25 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
 
   const handleSubmit = () => {
     if (submittedRef.current) return;
-    console.log('Submitting answers:', answers);
+    console.log('Submitting answers:', answersRef.current);
     submittedRef.current = true;
-    onSubmitAnswers(answers);
+    onSubmitAnswers(answersRef.current);
     setSubmitted(true);
   };
 
-  // Auto-submit when timer reaches 0
+  // Keep answers ref in sync
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  // Auto-submit when timer reaches 0 - only depend on timer
   useEffect(() => {
     console.log('Timer update:', timer, 'submitted:', submittedRef.current);
     if (timer === 0 && !submittedRef.current) {
-      console.log('Timer reached 0, auto-submitting with answers:', answers);
+      console.log('Timer reached 0, auto-submitting with answers:', answersRef.current);
       handleSubmit();
     }
-  }, [timer, answers]);
+  }, [timer]);
 
   // Reset for each new round
   useEffect(() => {
