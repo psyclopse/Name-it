@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './RoundPlaying.css';
 
 function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers }) {
@@ -9,6 +9,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     things: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const autoSubmittedRef = useRef(false); // Track if we've already auto-submitted
 
   const letter = roundData?.letter || '';
 
@@ -23,12 +24,19 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
     setSubmitted(true);
   };
 
-  // Auto-submit when timer reaches 0
+  // Auto-submit when timer reaches 0 (only once)
   useEffect(() => {
-    if (timer === 0 && !submitted) {
+    if (timer === 0 && !submitted && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true;
       handleSubmit();
     }
-  }, [timer, submitted]);
+  }, [timer]);
+
+  // Reset auto-submit flag when a new round starts
+  useEffect(() => {
+    autoSubmittedRef.current = false;
+    setSubmitted(false);
+  }, [roundData?.letter]);
 
   const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 
