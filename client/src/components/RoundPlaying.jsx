@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './RoundPlaying.css';
 
 function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers, onUpdateDraftAnswers }) {
@@ -9,6 +9,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers,
     things: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const prevTimerRef = useRef(null);
 
   const letter = roundData?.letter || '';
 
@@ -16,14 +17,20 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers,
   useEffect(() => {
     setAnswers({ people: '', animals: '', places: '', things: '' });
     setSubmitted(false);
+    prevTimerRef.current = null;
   }, [roundData?.letter, roundData?.startTime]);
 
-  // Auto-submit typed answers when the timer runs out
+  // Auto-submit only when the countdown actually reaches zero (not stale timer=0 from prior round)
   useEffect(() => {
-    if (timer === 0 && !submitted) {
+    if (submitted || timer == null) return;
+
+    const hadActiveCountdown = prevTimerRef.current !== null && prevTimerRef.current > 0;
+    if (hadActiveCountdown && timer === 0) {
       onSubmitAnswers(answers);
       setSubmitted(true);
     }
+
+    prevTimerRef.current = timer;
   }, [timer, submitted, answers, onSubmitAnswers]);
 
   const handleChange = (category, value) => {
@@ -41,7 +48,8 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers,
     setSubmitted(true);
   };
 
-  const timerColor = timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
+  const displayTimer = timer ?? '—';
+  const timerColor = timer == null ? '#667eea' : timer <= 10 ? '#e74c3c' : timer <= 15 ? '#f39c12' : '#667eea';
 
   return (
     <div className="round-playing">
@@ -49,7 +57,7 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers,
         <div className="timer-container">
           <div className="timer-circle" style={{ borderColor: timerColor }}>
             <span className="timer-value" style={{ color: timerColor }}>
-              {timer}
+              {displayTimer}
             </span>
           </div>
           <p className="timer-label">seconds remaining</p>

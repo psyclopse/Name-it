@@ -11,7 +11,8 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
   const [currentScreen, setCurrentScreen] = useState('waiting'); // waiting, selection, playing, grading, review, finished
   const [roundData, setRoundData] = useState(null);
   const gradingRoundRef = useRef(null); // Round we're grading - used to ignore stale roundEnded events
-  const [timer, setTimer] = useState(0);
+  const timerIntervalRef = useRef(null);
+  const [timer, setTimer] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -21,6 +22,11 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     });
     socket.on('roundReady', (data) => {
       gradingRoundRef.current = null;
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setTimer(null);
       setCurrentScreen('selection');
       setRoundData(data);
     });
@@ -30,19 +36,23 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       setRoundData(data);
       const startTime = data.startTime;
       const duration = data.duration;
-      
-      // Update timer every second
-      const interval = setInterval(() => {
+
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+
+      const updateTimer = () => {
         const elapsed = Date.now() - startTime;
         const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
         setTimer(remaining);
-        
         if (remaining === 0) {
-          clearInterval(interval);
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
         }
-      }, 100);
+      };
 
-      return () => clearInterval(interval);
+      updateTimer();
+      timerIntervalRef.current = setInterval(updateTimer, 100);
     });
 
     socket.on('roundEnded', (data) => {
@@ -52,14 +62,23 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
         return;
       }
       gradingRoundRef.current = null;
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setTimer(null);
       setCurrentScreen('review');
       setRoundData(data);
-      setTimer(0);
     });
 
     socket.on('startGrading', (data) => {
       console.log('startGrading event received:', data);
       gradingRoundRef.current = data.round ?? null;
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setTimer(null);
       setCurrentScreen('review');
       setRoundData(data);
     });
@@ -74,6 +93,10 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     });
 
     return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
       socket.off('roundReady');
       socket.off('roundStarted');
       socket.off('roundEnded');
