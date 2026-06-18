@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './RoundPlaying.css';
 
-function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers }) {
+function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers, onUpdateDraftAnswers }) {
   const [answers, setAnswers] = useState({
     people: '',
     animals: '',
@@ -12,9 +12,27 @@ function RoundPlaying({ roundData, timer, playerId, playerName, onSubmitAnswers 
 
   const letter = roundData?.letter || '';
 
+  // Reset form when a new round starts
+  useEffect(() => {
+    setAnswers({ people: '', animals: '', places: '', things: '' });
+    setSubmitted(false);
+  }, [roundData?.letter, roundData?.startTime]);
+
+  // Auto-submit typed answers when the timer runs out
+  useEffect(() => {
+    if (timer === 0 && !submitted) {
+      onSubmitAnswers(answers);
+      setSubmitted(true);
+    }
+  }, [timer, submitted, answers, onSubmitAnswers]);
+
   const handleChange = (category, value) => {
     if (submitted) return;
-    setAnswers(prev => ({ ...prev, [category]: value }));
+    setAnswers(prev => {
+      const next = { ...prev, [category]: value };
+      onUpdateDraftAnswers?.(next);
+      return next;
+    });
   };
 
   const handleSubmit = () => {

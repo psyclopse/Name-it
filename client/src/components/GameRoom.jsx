@@ -96,6 +96,10 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     socket.emit('submitAnswers', answers);
   };
 
+  const handleUpdateDraftAnswers = (answers) => {
+    socket.emit('updateDraftAnswers', answers);
+  };
+
   const handleSubmitGrades = (grades) => {
     socket.emit('submitGrades', { grades });
   };
@@ -141,6 +145,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
         playerId={playerId}
         playerName={playerName}
         onSubmitAnswers={handleSubmitAnswers}
+        onUpdateDraftAnswers={handleUpdateDraftAnswers}
       />
     );
   }

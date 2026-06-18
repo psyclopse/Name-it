@@ -24,23 +24,27 @@ function RoundReview({ roundData, playerId, onContinue, onSubmitGrades }) {
     });
   }
 
-  // Initialize grading structure when answers for grading are provided
+  // Initialize grading structure when assigned answer sheet is provided
   useEffect(() => {
-    const allAnswers = roundData?.allAnswers || {};
-    const initial = {};
-    Object.entries(allAnswers).forEach(([targetId, data]) => {
-      if (targetId === playerId) return; // don't grade yourself
-      initial[targetId] = {
+    const assignedTarget = roundData?.assignedTarget;
+    if (!assignedTarget) {
+      setGrades({});
+      setGradesSubmitted(false);
+      setProceedPressed(false);
+      return;
+    }
+
+    setGrades({
+      [assignedTarget.playerId]: {
         people: null,
         animals: null,
         places: null,
-        things: null
-      };
+        things: null,
+      },
     });
-    setGrades(initial);
     setGradesSubmitted(false);
     setProceedPressed(false);
-  }, [roundData, playerId]);
+  }, [roundData]);
 
   const handleGrade = (targetId, category, points) => {
     setGrades(prev => ({
@@ -98,13 +102,13 @@ function RoundReview({ roundData, playerId, onContinue, onSubmitGrades }) {
         </div>
 
         <div className="results-section">
-          {/* If we're in grading phase, `roundData.allAnswers` will be present */}
-          {roundData?.allAnswers ? (
-            Object.entries(roundData.allAnswers).map(([targetId, pdata]) => {
-              if (targetId === playerId) return null;
+          {/* Grading phase: review exactly one assigned answer sheet */}
+          {roundData?.assignedTarget ? (
+            (() => {
+              const { playerId: targetId, playerName, answers } = roundData.assignedTarget;
               return (
-                <div key={targetId} className="player-results">
-                  <h4 className="player-results-name">{pdata.playerName}</h4>
+                <div className="player-results">
+                  <h4 className="player-results-name">Reviewing: {playerName}</h4>
                   <div className="categories-results">
                     {['people', 'animals', 'places', 'things'].map(category => (
                       <div key={category} className="category-result">
@@ -115,7 +119,7 @@ function RoundReview({ roundData, playerId, onContinue, onSubmitGrades }) {
                           {category === 'things' && '📦 Thing'}
                         </div>
                         <div className="result-details grading">
-                          <span className="result-answer">{pdata.answers[category] || '(no answer)'}</span>
+                          <span className="result-answer">{answers[category] || '(no answer)'}</span>
                           <div className="grading-controls">
                             <button className={`grade-btn ${grades[targetId]?.[category] === 0 ? 'selected' : ''}`} onClick={() => handleGrade(targetId, category, 0)} disabled={gradesSubmitted}>❌ 0</button>
                             <button className={`grade-btn ${grades[targetId]?.[category] === 2 ? 'selected' : ''}`} onClick={() => handleGrade(targetId, category, 2)} disabled={gradesSubmitted}>🔄 2</button>
@@ -127,7 +131,7 @@ function RoundReview({ roundData, playerId, onContinue, onSubmitGrades }) {
                   </div>
                 </div>
               );
-            })
+            })()
           ) : (
             Object.entries(playerResults).map(([pid, playerData]) => (
               <div key={pid} className="player-results">
@@ -177,7 +181,7 @@ function RoundReview({ roundData, playerId, onContinue, onSubmitGrades }) {
         </div>
 
         <div className="continue-section">
-          {roundData?.allAnswers ? (
+          {roundData?.assignedTarget ? (
             // grading phase controls
             gradesSubmitted ? (
               <p className="grading-submitted-text">✓ Grades submitted — waiting for other players</p>

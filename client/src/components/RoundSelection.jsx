@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './RoundSelection.css';
 
 function RoundSelection({ roundData, playerId, onSelectLetter }) {
   const [selectedLetter, setSelectedLetter] = useState(null);
+
+  useEffect(() => {
+    setSelectedLetter(null);
+  }, [roundData?.round]);
   
-  // Any player can select a letter
-  const canSelect = true;
+  const canSelect = roundData?.pickerPlayerId === playerId;
+  const pickerName = roundData?.pickerPlayerName || 'another player';
 
   const handleLetterClick = (letter) => {
     if (!canSelect || roundData.usedLetters.includes(letter)) return;
@@ -48,7 +52,7 @@ function RoundSelection({ roundData, playerId, onSelectLetter }) {
                       key={letter}
                       className={`letter-btn ${isUsed ? 'used' : ''} ${isSelected ? 'selected' : ''}`}
                       onClick={() => handleLetterClick(letter)}
-                      disabled={isUsed || isSelected}
+                      disabled={isUsed || isSelected || !canSelect}
                     >
                       {letter}
                     </button>
@@ -58,7 +62,7 @@ function RoundSelection({ roundData, playerId, onSelectLetter }) {
             </>
           ) : (
             <div className="waiting-selection">
-              <p>Waiting for a player to select a letter...</p>
+              <p>Waiting for <strong>{pickerName}</strong> to select a letter...</p>
             </div>
           )}
         </div>
