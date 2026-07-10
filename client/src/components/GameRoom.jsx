@@ -14,11 +14,16 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
   const timerIntervalRef = useRef(null);
   const [timer, setTimer] = useState(null);
   const [error, setError] = useState(null);
+  const [playerLeftNotice, setPlayerLeftNotice] = useState(null);
 
   useEffect(() => {
     socket.on('error', ({ message }) => {
       setError(message);
       setTimeout(() => setError(null), 5000);
+    });
+    socket.on('playerLeft', ({ playerName }) => {
+      setPlayerLeftNotice(`${playerName} left the room`);
+      setTimeout(() => setPlayerLeftNotice(null), 5000);
     });
     socket.on('roundReady', (data) => {
       gradingRoundRef.current = null;
@@ -104,6 +109,7 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
       socket.off('gameFinished');
       socket.off('answerSubmitted');
       socket.off('error');
+      socket.off('playerLeft');
     };
   }, [socket]);
 
@@ -131,26 +137,40 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
     socket.emit('pressProceed');
   };
 
+  const renderNotice = () => (
+    <>
+      {error && (
+        <div className="error-toast" onClick={() => setError(null)}>
+          {error}
+        </div>
+      )}
+      {playerLeftNotice && (
+        <div className="player-left-toast" onClick={() => setPlayerLeftNotice(null)}>
+          {playerLeftNotice}
+        </div>
+      )}
+    </>
+  );
+
   if (currentScreen === 'waiting') {
     return (
-      <WaitingRoom
-        roomCode={roomCode}
-        gameState={gameState}
-        playerId={playerId}
-        onStartGame={handleStartGame}
-        onBackToLobby={onBackToLobby}
-      />
+      <>
+        {renderNotice()}
+        <WaitingRoom
+          roomCode={roomCode}
+          gameState={gameState}
+          playerId={playerId}
+          onStartGame={handleStartGame}
+          onBackToLobby={onBackToLobby}
+        />
+      </>
     );
   }
 
   if (currentScreen === 'selection') {
     return (
       <>
-        {error && (
-          <div className="error-toast" onClick={() => setError(null)}>
-            {error}
-          </div>
-        )}
+        {renderNotice()}
         <RoundSelection
           roundData={roundData}
           playerId={playerId}
@@ -162,34 +182,43 @@ function GameRoom({ socket, roomCode, playerId, playerName, gameState, onBackToL
 
   if (currentScreen === 'playing') {
     return (
-      <RoundPlaying
-        roundData={roundData}
-        timer={timer}
-        playerId={playerId}
-        playerName={playerName}
-        onSubmitAnswers={handleSubmitAnswers}
-        onUpdateDraftAnswers={handleUpdateDraftAnswers}
-      />
+      <>
+        {renderNotice()}
+        <RoundPlaying
+          roundData={roundData}
+          timer={timer}
+          playerId={playerId}
+          playerName={playerName}
+          onSubmitAnswers={handleSubmitAnswers}
+          onUpdateDraftAnswers={handleUpdateDraftAnswers}
+        />
+      </>
     );
   }
 
   if (currentScreen === 'review') {
     return (
-      <RoundReview
-        roundData={roundData}
-        playerId={playerId}
-        onContinue={handleContinueRound}
-        onSubmitGrades={handleSubmitGrades}
-      />
+      <>
+        {renderNotice()}
+        <RoundReview
+          roundData={roundData}
+          playerId={playerId}
+          onContinue={handleContinueRound}
+          onSubmitGrades={handleSubmitGrades}
+        />
+      </>
     );
   }
 
   if (currentScreen === 'finished') {
     return (
-      <GameFinished
-        roundData={roundData}
-        onBackToLobby={onBackToLobby}
-      />
+      <>
+        {renderNotice()}
+        <GameFinished
+          roundData={roundData}
+          onBackToLobby={onBackToLobby}
+        />
+      </>
     );
   }
 

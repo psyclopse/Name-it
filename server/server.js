@@ -577,13 +577,20 @@ io.on('connection', (socket) => {
     if (playerData) {
       const gameState = rooms.get(playerData.roomCode);
       if (gameState) {
+        const leftPlayerName = playerData.playerName;
         gameState.players = gameState.players.filter(p => p.id !== socket.id);
         gameState.scores.delete(socket.id);
+        gameState.answers.delete(socket.id);
+        gameState.draftAnswers.delete(socket.id);
+        gameState.grades.delete(socket.id);
+        gameState.proceed.delete(socket.id);
+        gameState.reviewAssignments.delete(socket.id);
         players.delete(socket.id);
         
         if (gameState.players.length === 0) {
           rooms.delete(playerData.roomCode);
         } else {
+          io.to(playerData.roomCode).emit('playerLeft', { playerName: leftPlayerName });
           io.to(playerData.roomCode).emit('gameStateUpdate', gameState);
         }
       }
