@@ -571,29 +571,41 @@ io.on('connection', (socket) => {
     }
   });
 
+  const removePlayerFromRoom = (socketId, roomCode, playerName) => {
+    const gameState = rooms.get(roomCode);
+    if (!gameState) return false;
+
+    gameState.players = gameState.players.filter(p => p.id !== socketId);
+    gameState.scores.delete(socketId);
+    gameState.answers.delete(socketId);
+    gameState.draftAnswers.delete(socketId);
+    gameState.grades.delete(socketId);
+    gameState.proceed.delete(socketId);
+    gameState.reviewAssignments.delete(socketId);
+    players.delete(socketId);
+
+    if (gameState.players.length === 0) {
+      rooms.delete(roomCode);
+      return true;
+    }
+
+    io.to(roomCode).emit('playerLeft', { playerName });
+    io.to(roomCode).emit('gameStateUpdate', gameState);
+    return true;
+  };
+
+  socket.on('leaveRoom', () => {
+    const playerData = players.get(socket.id);
+    if (!playerData) return;
+
+    removePlayerFromRoom(socket.id, playerData.roomCode, playerData.playerName);
+  });
+
   // Disconnect handling
   socket.on('disconnect', () => {
     const playerData = players.get(socket.id);
     if (playerData) {
-      const gameState = rooms.get(playerData.roomCode);
-      if (gameState) {
-        const leftPlayerName = playerData.playerName;
-        gameState.players = gameState.players.filter(p => p.id !== socket.id);
-        gameState.scores.delete(socket.id);
-        gameState.answers.delete(socket.id);
-        gameState.draftAnswers.delete(socket.id);
-        gameState.grades.delete(socket.id);
-        gameState.proceed.delete(socket.id);
-        gameState.reviewAssignments.delete(socket.id);
-        players.delete(socket.id);
-        
-        if (gameState.players.length === 0) {
-          rooms.delete(playerData.roomCode);
-        } else {
-          io.to(playerData.roomCode).emit('playerLeft', { playerName: leftPlayerName });
-          io.to(playerData.roomCode).emit('gameStateUpdate', gameState);
-        }
-      }
+      removePlayerFromRoom(socket.id, playerData.roomCode, playerData.playerName);
     }
     console.log('User disconnected:', socket.id);
   });

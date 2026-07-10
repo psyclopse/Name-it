@@ -76,6 +76,9 @@ function App() {
     setRoomCode(null);
     setPlayerId(null);
     setGameState(null);
+    if (roomCode) {
+      socket.emit('leaveRoom');
+    }
     socket.disconnect();
     socket.connect();
   };
