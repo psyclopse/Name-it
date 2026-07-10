@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import Lobby from './components/Lobby';
 import GameRoom from './components/GameRoom';
 import './App.css';
+import './components/ErrorToast.css';
 
 // Use environment variable for backend URL, fallback to localhost for development
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -15,6 +16,7 @@ function App() {
   const [playerName, setPlayerName] = useState('');
   const [gameState, setGameState] = useState(null);
   const [error, setError] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
 
   useEffect(() => {
     socket.on('roomCreated', ({ roomCode, playerId }) => {
@@ -43,12 +45,19 @@ function App() {
       setError(message);
     });
 
+    socket.on('playerLeft', ({ playerName }) => {
+      const message = `${playerName} left the room`;
+      setToastMessage(message);
+      window.setTimeout(() => setToastMessage(null), 5000);
+    });
+
     return () => {
       socket.off('roomCreated');
       socket.off('roomJoined');
       socket.off('joinError');
       socket.off('gameStateUpdate');
       socket.off('error');
+      socket.off('playerLeft');
     };
   }, []);
 
@@ -73,6 +82,11 @@ function App() {
 
   return (
     <div className="app">
+      {toastMessage && (
+        <div className="player-left-toast">
+          {toastMessage}
+        </div>
+      )}
       {screen === 'lobby' ? (
         <Lobby
           onCreateRoom={handleCreateRoom}
